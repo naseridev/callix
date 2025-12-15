@@ -21,6 +21,79 @@ callix = "0.1.0"
 tokio = { version = "1", features = ["full"] }
 serde_json = "1.0"
 ```
+### Step-by-Step Setup
+
+1. **Create a new Rust project**
+```bash
+   cargo new my_callix_project
+   cd my_callix_project
+```
+
+2. **Add dependencies**
+
+   Using `cargo add` (Rust 1.62+):
+```bash
+   cargo add callix
+   cargo add tokio --features full
+   cargo add serde_json
+```
+
+   Or manually in `Cargo.toml`:
+```toml
+   [dependencies]
+   callix = "0.1.0"
+   tokio = { version = "1", features = ["full"] }
+   serde_json = "1.0"
+```
+
+3. **Write your first code in src/main.rs**
+```rust
+   use callix::CallixBuilder;
+   use std::time::Duration;
+
+   #[tokio::main]
+   async fn main() -> Result<(), Box<dyn std::error::Error>> {
+       let callix = CallixBuilder::new()
+           .timeout(Duration::from_secs(60))
+           .build()?;
+
+       println!("Callix is ready!");
+       Ok(())
+   }
+```
+
+4. **Run your project**
+```bash
+   cargo run
+```
+
+### Optional: Environment Variables Setup
+
+For API keys, create a `.env` file:
+```bash
+# .env
+OPENAI_API_KEY=sk-your-key-here
+GEMINI_API_KEY=your-key-here
+```
+
+Add `dotenv`:
+```bash
+cargo add dotenv
+```
+
+Load in your code:
+```rust
+use dotenv::dotenv;
+use std::env;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    dotenv().ok();
+    let api_key = env::var("OPENAI_API_KEY")?;
+    // Use api_key...
+    Ok(())
+}
+```
 
 ## Quick Start
 
