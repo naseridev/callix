@@ -1,6 +1,6 @@
 [package]
 name = "callix"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 authors = ["Nima Naseri <nerdnull@proton.me>"]
 description = "A flexible HTTP client library for calling various AI APIs or somthing with configuration and templating support"
