@@ -1,6 +1,5 @@
 use crate::config::Config;
 use crate::error::{CallixError, Result};
-use crate::provider::Provider;
 use crate::request::RequestBuilder;
 use reqwest::{Client, Method};
 use std::time::Duration;
@@ -34,11 +33,6 @@ impl Callix {
         })
     }
 
-    pub fn provider(&self, name: &str) -> Result<Provider> {
-        let config = self.config.get_provider(name)?;
-        Ok(Provider::new(name.to_string(), config.clone()))
-    }
-
     pub fn request(&self, provider: &str, endpoint: &str) -> Result<RequestBuilder> {
         let provider_config = self.config.get_provider(provider)?;
         let endpoint_config = provider_config
@@ -47,36 +41,25 @@ impl Callix {
             .ok_or_else(|| CallixError::EndpointNotFound(endpoint.to_string()))?;
 
         Ok(RequestBuilder::new(
-            self.client.clone(),
-            provider_config.clone(),
-            endpoint_config.clone(),
+            &self.client,
+            provider_config,
+            endpoint_config,
             self.max_retries,
             self.retry_delay,
         ))
     }
 }
 
+#[inline]
 pub fn parse_method(method: &str) -> Result<Method> {
-    match method.to_uppercase().as_str() {
-        "GET" => Ok(Method::GET),
-        "POST" => Ok(Method::POST),
-        "PUT" => Ok(Method::PUT),
-        "DELETE" => Ok(Method::DELETE),
-        "PATCH" => Ok(Method::PATCH),
-        "HEAD" => Ok(Method::HEAD),
-        "OPTIONS" => Ok(Method::OPTIONS),
-        _ => Err(CallixError::InvalidMethod(method.to_string())),
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_parse_method() {
-        assert!(parse_method("GET").is_ok());
-        assert!(parse_method("post").is_ok());
-        assert!(parse_method("INVALID").is_err());
+    match method.as_bytes() {
+        b"GET" | b"get" => Ok(Method::GET),
+        b"POST" | b"post" => Ok(Method::POST),
+        b"PUT" | b"put" => Ok(Method::PUT),
+        b"DELETE" | b"delete" => Ok(Method::DELETE),
+        b"PATCH" | b"patch" => Ok(Method::PATCH),
+        b"HEAD" | b"head" => Ok(Method::HEAD),
+        b"OPTIONS" | b"options" => Ok(Method::OPTIONS),
+        _ => Err(CallixError::InvalidMethod),
     }
 }

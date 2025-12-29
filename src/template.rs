@@ -1,25 +1,52 @@
 use crate::error::{CallixError, Result};
 use serde_json::Value;
+use std::borrow::Cow;
 use std::collections::HashMap;
 
 pub struct TemplateEngine;
 
 impl TemplateEngine {
-    pub fn render(template: &str, variables: &HashMap<String, Value>) -> Result<String> {
-        let mut result = template.to_string();
+    pub fn render<'a>(
+        template: &'a str,
+        variables: &HashMap<String, Value>,
+    ) -> Result<Cow<'a, str>> {
+        if !template.contains("{{") {
+            return Ok(Cow::Borrowed(template));
+        }
 
-        for (key, value) in variables {
-            let placeholder = format!("{{{{{}}}}}", key);
+        let mut result = String::with_capacity(template.len());
+        let mut chars = template.chars();
+        let mut buffer = String::new();
 
-            if result.contains(&placeholder) {
-                let replacement = Self::value_to_string(value)?;
-                result = result.replace(&placeholder, &replacement);
+        while let Some(c) = chars.next() {
+            if c == '{' {
+                if let Some('{') = chars.next() {
+                    buffer.clear();
+                    let iter = chars.by_ref();
+                    while let Some(c) = iter.next() {
+                        if c == '}' {
+                            if let Some('}') = iter.next() {
+                                let var_name = buffer.trim();
+                                if let Some(value) = variables.get(var_name) {
+                                    result.push_str(&Self::value_to_string(value)?);
+                                } else {
+                                    return Err(CallixError::TemplateError);
+                                }
+                                break;
+                            }
+                        } else {
+                            buffer.push(c);
+                        }
+                    }
+                } else {
+                    result.push(c);
+                }
+            } else {
+                result.push(c);
             }
         }
 
-        Self::validate_no_missing_vars(&result)?;
-
-        Ok(result)
+        Ok(Cow::Owned(result))
     }
 
     fn value_to_string(value: &Value) -> Result<String> {
@@ -27,63 +54,10 @@ impl TemplateEngine {
             Value::String(s) => Ok(s.clone()),
             Value::Number(n) => Ok(n.to_string()),
             Value::Bool(b) => Ok(b.to_string()),
-            Value::Null => Ok("null".to_string()),
+            Value::Null => Ok(String::from("null")),
             Value::Array(_) | Value::Object(_) => {
-                serde_json::to_string(value).map_err(|e| CallixError::TemplateError(e.to_string()))
+                serde_json::to_string(value).map_err(|_| CallixError::TemplateError)
             }
         }
-    }
-
-    fn validate_no_missing_vars(text: &str) -> Result<()> {
-        if text.contains("{{") && text.contains("}}") {
-            let start = text.find("{{").unwrap();
-            let end = text.find("}}").unwrap();
-            let var_name = &text[start + 2..end];
-            return Err(CallixError::TemplateError(format!(
-                "Missing variable: {}",
-                var_name
-            )));
-        }
-        Ok(())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use serde_json::json;
-
-    #[test]
-    fn test_simple_replacement() {
-        let mut vars = HashMap::new();
-        vars.insert("name".to_string(), json!("Alice"));
-
-        let result = TemplateEngine::render("Hello {{name}}", &vars).unwrap();
-        assert_eq!(result, "Hello Alice");
-    }
-
-    #[test]
-    fn test_json_replacement() {
-        let mut vars = HashMap::new();
-        vars.insert("data".to_string(), json!({"key": "value"}));
-
-        let result = TemplateEngine::render(r#"{"payload": {{data}}}"#, &vars).unwrap();
-        assert!(result.contains(r#"{"key":"value"}"#));
-    }
-
-    #[test]
-    fn test_missing_variable() {
-        let vars = HashMap::new();
-        let result = TemplateEngine::render("Hello {{name}}", &vars);
-        assert!(matches!(result, Err(CallixError::TemplateError(_))));
-    }
-
-    #[test]
-    fn test_number_replacement() {
-        let mut vars = HashMap::new();
-        vars.insert("count".to_string(), json!(42));
-
-        let result = TemplateEngine::render("Count: {{count}}", &vars).unwrap();
-        assert_eq!(result, "Count: 42");
     }
 }

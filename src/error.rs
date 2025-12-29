@@ -4,31 +4,29 @@ pub type Result<T> = std::result::Result<T, CallixError>;
 
 #[derive(Debug)]
 pub enum CallixError {
-    ConfigNotFound(String),
-    InvalidConfig(String),
-    ProviderNotFound(String),
+    ConfigNotFound,
+    InvalidConfig,
+    ProviderNotFound,
     EndpointNotFound(String),
     HttpError(reqwest::Error),
-    TemplateError(String),
-    SerializationError(String),
+    TemplateError,
     TimeoutError,
     MaxRetriesExceeded,
-    InvalidMethod(String),
+    InvalidMethod,
 }
 
 impl fmt::Display for CallixError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Self::ConfigNotFound(path) => write!(f, "Config file not found: {}", path),
-            Self::InvalidConfig(msg) => write!(f, "Invalid config: {}", msg),
-            Self::ProviderNotFound(name) => write!(f, "Provider not found: {}", name),
+            Self::ConfigNotFound => write!(f, "Config file not found"),
+            Self::InvalidConfig => write!(f, "Invalid config"),
+            Self::ProviderNotFound => write!(f, "Provider not found"),
             Self::EndpointNotFound(name) => write!(f, "Endpoint not found: {}", name),
             Self::HttpError(e) => write!(f, "HTTP error: {}", e),
-            Self::TemplateError(msg) => write!(f, "Template error: {}", msg),
-            Self::SerializationError(msg) => write!(f, "Serialization error: {}", msg),
+            Self::TemplateError => write!(f, "Template error"),
             Self::TimeoutError => write!(f, "Request timeout"),
             Self::MaxRetriesExceeded => write!(f, "Max retries exceeded"),
-            Self::InvalidMethod(method) => write!(f, "Invalid HTTP method: {}", method),
+            Self::InvalidMethod => write!(f, "Invalid HTTP method"),
         }
     }
 }
@@ -42,19 +40,7 @@ impl From<reqwest::Error> for CallixError {
 }
 
 impl From<serde_json::Error> for CallixError {
-    fn from(err: serde_json::Error) -> Self {
-        Self::SerializationError(err.to_string())
-    }
-}
-
-impl From<serde_yaml::Error> for CallixError {
-    fn from(err: serde_yaml::Error) -> Self {
-        Self::InvalidConfig(err.to_string())
-    }
-}
-
-impl From<std::io::Error> for CallixError {
-    fn from(err: std::io::Error) -> Self {
-        Self::ConfigNotFound(err.to_string())
+    fn from(_: serde_json::Error) -> Self {
+        Self::TemplateError
     }
 }

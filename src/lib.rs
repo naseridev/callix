@@ -1,14 +1,12 @@
 pub mod client;
 pub mod config;
 pub mod error;
-pub mod provider;
 pub mod request;
 pub mod response;
 pub mod template;
 
 pub use client::Callix;
 pub use error::{CallixError, Result};
-pub use provider::Provider;
 pub use request::RequestBuilder;
 pub use response::CallixResponse;
 
@@ -33,6 +31,7 @@ impl Default for CallixBuilder {
 }
 
 impl CallixBuilder {
+    #[inline]
     pub fn new() -> Self {
         Self::default()
     }

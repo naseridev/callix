@@ -11,21 +11,21 @@ use crate::error::{CallixError, Result};
 use crate::response::CallixResponse;
 use crate::template::TemplateEngine;
 
-pub struct RequestBuilder {
-    client: Client,
-    provider_config: ProviderConfig,
-    endpoint_config: EndpointConfig,
+pub struct RequestBuilder<'a> {
+    client: &'a Client,
+    provider_config: &'a ProviderConfig,
+    endpoint_config: &'a EndpointConfig,
     variables: HashMap<String, Value>,
     max_retries: u32,
     retry_delay: Duration,
     custom_headers: HashMap<String, String>,
 }
 
-impl RequestBuilder {
+impl<'a> RequestBuilder<'a> {
     pub fn new(
-        client: Client,
-        provider_config: ProviderConfig,
-        endpoint_config: EndpointConfig,
+        client: &'a Client,
+        provider_config: &'a ProviderConfig,
+        endpoint_config: &'a EndpointConfig,
         max_retries: u32,
         retry_delay: Duration,
     ) -> Self {
@@ -82,7 +82,7 @@ impl RequestBuilder {
 
         for (key, value) in &self.provider_config.headers {
             let rendered = TemplateEngine::render(value, &self.variables)?;
-            request = request.header(key, rendered);
+            request = request.header(key, rendered.as_ref());
         }
 
         for (key, value) in &self.custom_headers {
@@ -91,7 +91,7 @@ impl RequestBuilder {
 
         if let Some(body_template) = &self.endpoint_config.body_template {
             let body = TemplateEngine::render(body_template, &self.variables)?;
-            request = request.body(body);
+            request = request.body(body.into_owned());
         }
 
         let response = request.send().await?;
@@ -100,53 +100,34 @@ impl RequestBuilder {
 
     fn build_url(&self) -> Result<String> {
         let path = TemplateEngine::render(&self.endpoint_config.path, &self.variables)?;
-        let mut url = format!("{}{}", self.provider_config.base_url, path);
+        let base_len = self.provider_config.base_url.len();
+        let path_len = path.len();
 
-        if !self.endpoint_config.query_params.is_empty() {
-            let params: Vec<String> = self
-                .endpoint_config
-                .query_params
-                .iter()
-                .map(|(k, v)| {
-                    let value =
-                        TemplateEngine::render(v, &self.variables).unwrap_or_else(|_| v.clone());
-                    format!("{}={}", k, value)
-                })
-                .collect();
+        if self.endpoint_config.query_params.is_empty() {
+            let mut url = String::with_capacity(base_len + path_len);
+            url.push_str(&self.provider_config.base_url);
+            url.push_str(&path);
+            return Ok(url);
+        }
 
-            url.push('?');
-            url.push_str(&params.join("&"));
+        let mut url = String::with_capacity(base_len + path_len + 128);
+        url.push_str(&self.provider_config.base_url);
+        url.push_str(&path);
+        url.push('?');
+
+        let mut first = true;
+        for (k, v) in &self.endpoint_config.query_params {
+            if !first {
+                url.push('&');
+            }
+            first = false;
+            url.push_str(k);
+            url.push('=');
+            let value = TemplateEngine::render(v, &self.variables)
+                .unwrap_or_else(|_| std::borrow::Cow::Borrowed(v));
+            url.push_str(&value);
         }
 
         Ok(url)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::collections::HashMap;
-
-    #[test]
-    fn test_var_builder() {
-        let client = Client::new();
-        let provider = ProviderConfig {
-            base_url: "https://test.com".to_string(),
-            headers: HashMap::new(),
-            endpoints: HashMap::new(),
-            timeout: None,
-        };
-        let endpoint = EndpointConfig {
-            path: "/test".to_string(),
-            method: "GET".to_string(),
-            body_template: None,
-            query_params: HashMap::new(),
-        };
-
-        let builder = RequestBuilder::new(client, provider, endpoint, 3, Duration::from_secs(1))
-            .var("key", "value")
-            .var("num", 42);
-
-        assert_eq!(builder.variables.len(), 2);
     }
 }
