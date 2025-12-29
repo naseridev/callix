@@ -20,7 +20,6 @@ A flexible, configuration-driven HTTP client library for Rust, designed for seam
 - [Examples](#examples)
 - [Documentation](#documentation)
 - [Contributing](#contributing)
-- [License](#license)
 
 ## Installation
 
